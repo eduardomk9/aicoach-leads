@@ -4,7 +4,7 @@ namespace AiCoach.Leads.Application;
 /// Prompt do papel "miner" (R21): procura PESSOAS SUSCETÍVEIS a gastar dinheiro por
 /// mais serviços (fala do dono) — quem demonstra querer acompanhamento humano ou
 /// plano pago. É vocabulário canônico do miner: os valores de sinais/intenção/
-/// ParaQuem são o CONTRATO que a mesa dbo.Leads + SinalConversa + o BI esperam —
+/// ParaQuem são o CONTRATO que a mesa dbo.Leads + dbo.ConversationSignals + o BI esperam —
 /// mudar aqui é mudar o contrato, com testes. JSON mode do provedor.
 /// </summary>
 public static class MinerPrompt
