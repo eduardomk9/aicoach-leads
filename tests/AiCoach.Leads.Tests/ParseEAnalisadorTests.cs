@@ -99,3 +99,20 @@ r1.TokensIn.Should().Be(3600);
 
     private static ILogger<AnalisadorDeSessoes> NullLog() => Mock.Of<ILogger<AnalisadorDeSessoes>>();
 }
+
+public sealed class MinerAgentParaQuemTests
+{
+    /// <summary>A1: o agent NUNCA descarta o ParaQuem do parse (o bug em produo:
+    /// as 2 rows da mesa ficaram 'indefinido' com a IA dizendo 'coach').</summary>
+    [Fact]
+    public void Analisador_Replica_ParaQuem_Do_Parse()
+    {
+        // O caminho que a produção roda: o ParsearJuizo e a reconstrução do agent.
+        var juizo = AnalisadorDeSessoes.ParsearJuizo(
+            "{\"sinal_treino\":1,\"intencao\":3,\"paraquem\":\"coach\",\"resumo\":\"quer coach\",\"motivo\":\"pediu\"}");
+
+        juizo.ParaQuem.Should().Be("coach");
+        juizo.Intenção.Should().Be(3);
+        juizo.Motivo.Should().Be("pediu");
+    }
+}

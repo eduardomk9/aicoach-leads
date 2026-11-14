@@ -94,6 +94,7 @@ public sealed class OpenAiCompatibleMinerAgent(
             SinalDieta = juizo.SinalDieta,
             SinalRelatorio = juizo.SinalRelatorio,
             Intenção = juizo.Intenção,
+            ParaQuem = juizo.ParaQuem,
             Resumo = juizo.Resumo,
             Motivo = juizo.Motivo,
             TokensIn = tokensIn,
