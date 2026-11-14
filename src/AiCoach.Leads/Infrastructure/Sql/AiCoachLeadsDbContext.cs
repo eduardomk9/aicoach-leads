@@ -54,6 +54,7 @@ public sealed class AiCoachLeadsDbContext(DbContextOptions<AiCoachLeadsDbContext
         modelBuilder.Entity<JobEstadoEntity>(e =>
         {
             e.ToTable("JobEstado");
+            e.HasKey(x => x.Chave);
             e.Property(x => x.Chave).HasColumnName("Chave").HasMaxLength(64);
             e.Property(x => x.UltimaExecucao).HasColumnType("datetime2");
             e.Property(x => x.Notas).HasMaxLength(200);

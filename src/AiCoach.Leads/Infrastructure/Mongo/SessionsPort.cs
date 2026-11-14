@@ -17,10 +17,13 @@ public sealed class SessionsPort(IMongoClient client, string database) : ISessio
 
     public async Task<IReadOnlyList<SessionSlice>> NovasDesdeAsync(DateTimeOffset desde, int maxSessoes, CancellationToken cancellationToken)
     {
-        var stamp = BsonDateTime.Create(desde.UtcDateTime);
+        // O APP grava DateTimeOffset como BSON ARRAY [ticks, offsetMinutos] (serializer
+        // default .NET) — o filtro compara o SUBCAMPO "timestamp.0" (os ticks, Int64).
+        // O offset do app  UTC (0) sempre: a comparao por ticks  determinstica.
+        var ticks = desde.UtcDateTime.Ticks;
 
-        var novoInput = new BsonDocument("inputs", new BsonDocument("$elemMatch", new BsonDocument("timestamp", new BsonDocument("$gte", stamp))));
-        var novaSessao = new BsonDocument("created_at", new BsonDocument("$gte", stamp));
+        var novoInput = new BsonDocument("inputs", new BsonDocument("$elemMatch", new BsonDocument("timestamp.0", new BsonDocument("$gte", ticks))));
+        var novaSessao = new BsonDocument("created_at.0", new BsonDocument("$gte", ticks));
         var filtro = new BsonDocument("$or", new BsonArray { novoInput, novaSessao });
 
         var projection = new BsonDocument
@@ -31,13 +34,9 @@ public sealed class SessionsPort(IMongoClient client, string database) : ISessio
             ["flows.state"] = 1,
             ["flows.completed_at"] = 1,
             ["extracted_data"] = 1,
-            ["inputs.timestamp"] = 1,
-            ["inputs.type"] = 1,
-            ["inputs.message"] = 1,
-            ["inputs.output"] = 0,
-            ["inputs.image"] = 0,
-            ["inputs.audio"] = 0,
-            ["inputs.guardrail"] = 0,
+            // Incluso de SUBCAMPOS do array (a excluso dentro de incluso no existe no Mongo):
+            // a voz do cliente entra, o texto do COACH (output) fica fora.
+            ["inputs"] = new BsonDocument { ["timestamp"] = 1, ["type"] = 1, ["message"] = 1 },
         };
 
         var sort = new BsonDocument("created_at", 1);
@@ -121,10 +120,21 @@ public sealed class SessionsPort(IMongoClient client, string database) : ISessio
         };
     }
 
+    /// <summary>L Data: o formato do app = BSON ARRAY [ticks, offsetMinutos] (o serializer
+    /// default do DateTimeOffset). BsonDateTime/strings ficam como fallback.</summary>
     private static DateTimeOffset LerData(BsonDocument doc, string campo)
     {
         if (doc.TryGetValue(campo, out var valor))
         {
+            if (valor.BsonType == BsonType.Array
+                && valor.AsBsonArray.Count >= 2
+                && valor.AsBsonArray[0].BsonType == BsonType.Int64)
+            {
+                var ticks = valor.AsBsonArray[0].AsInt64;
+                var minutos = valor.AsBsonArray[1].AsInt32;
+                return new DateTimeOffset(ticks, TimeSpan.FromMinutes(minutos));
+            }
+
             if (valor.BsonType == BsonType.DateTime)
             {
                 return new DateTimeOffset(valor.ToUniversalTime(), TimeSpan.Zero);

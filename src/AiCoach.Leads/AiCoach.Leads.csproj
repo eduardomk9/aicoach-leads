@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AiCoach.Leads</RootNamespace>
+    <UserSecretsId>abc68347-1209-4b4f-bb19-f54eb0da83bf</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

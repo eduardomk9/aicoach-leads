@@ -17,8 +17,8 @@ using MongoDB.Driver;
 // ficam em user-secrets no DEV / env no Actions, nunca neste arquivo.
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddSingleton<IMinerAgent, OpenAiCompatibleMinerAgent>();
 builder.Services.Configure<MinerAgentOptions>(builder.Configuration.GetSection(MinerAgentOptions.Section));
+builder.Services.AddHttpClient<IMinerAgent, OpenAiCompatibleMinerAgent>();
 
 var mongoConn = builder.Configuration["ConnectionStrings:MongoConnection"];
 if (string.IsNullOrWhiteSpace(mongoConn))
@@ -27,7 +27,7 @@ if (string.IsNullOrWhiteSpace(mongoConn))
     return 2;
 }
 var mongoClient = new MongoClient(mongoConn);
-builder.Services.AddSingleton(mongoClient);
+builder.Services.AddSingleton<IMongoClient>(mongoClient);
 builder.Services.AddSingleton<ISessionsPort>(sp =>
     new SessionsPort(sp.GetRequiredService<IMongoClient>(), "AiCoach"));
 
@@ -52,11 +52,13 @@ var dry = args.Contains("--dry");
 if (modo == "--ver")
 {
     // Consulta sem custo: o marcador atual + quantas sessões novas existem.
-    var analyzer = host.Services.GetRequiredService<AnalisadorDeSessoes>();
-    var estado = host.Services.GetRequiredService<IJobEstadoPort>();
+    // Os Scoped resolvem dentro de um scope (a régua do DI).
+    using var scope = host.Services.CreateScope();
+    var analyzer = scope.ServiceProvider.GetRequiredService<AnalisadorDeSessoes>();
+    var estado = scope.ServiceProvider.GetRequiredService<IJobEstadoPort>();
     var marcador = await estado.CarregarAsync(AnalisadorDeSessoes.ChaveEstado, DateTimeOffset.UtcNow - AnalisadorDeSessoes.JanelaInicial, CancellationToken.None);
     Console.WriteLine($"MARCADOR_ATUAL={marcador:o}");
-    var port = host.Services.GetRequiredService<ISessionsPort>();
+    var port = scope.ServiceProvider.GetRequiredService<ISessionsPort>();
     var novas = await port.NovasDesdeAsync(marcador, maxSessoes, CancellationToken.None);
     Console.WriteLine($"SESSOES_NOVAS={novas.Count}");
     foreach (var s in novas)
@@ -69,12 +71,13 @@ if (modo == "--ver")
 
 if (modo == "--rodar")
 {
-    var analisador = host.Services.GetRequiredService<AnalisadorDeSessoes>();
+    using var scope = host.Services.CreateScope();
+    var analisador = scope.ServiceProvider.GetRequiredService<AnalisadorDeSessoes>();
     if (dry)
     {
         Console.WriteLine("MODO_DRY: os briefings vao ser montados e impressos SEM chamar o LLM e SEM gravar.");
-        var port = host.Services.GetRequiredService<ISessionsPort>();
-        var estado = host.Services.GetRequiredService<IJobEstadoPort>();
+        var port = scope.ServiceProvider.GetRequiredService<ISessionsPort>();
+        var estado = scope.ServiceProvider.GetRequiredService<IJobEstadoPort>();
         var marcador = await estado.CarregarAsync(AnalisadorDeSessoes.ChaveEstado, DateTimeOffset.UtcNow - AnalisadorDeSessoes.JanelaInicial, CancellationToken.None);
         var novas = await port.NovasDesdeAsync(marcador, maxSessoes, CancellationToken.None);
         foreach (var s in novas)

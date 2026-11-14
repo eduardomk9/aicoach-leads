@@ -15,21 +15,29 @@ public sealed class SinalRepository(AiCoachLeadsDbContext db) : ISinalRepository
             return 0;
         }
 
+        // O ESTOQUE SO ACEITA USUARIO REAL: sessoes de ids que nao existem em Users
+        // (as personas legadas do R18 no Atlas) ficam DE FORA (sem FK violation).
+        var ids = sinais.Select(s => s.UserId).Distinct().ToList();
+        var phones = await db.Users
+            .Where(u => ids.Contains(u.UserId))
+            .Select(u => new { u.UserId, u.Phone })
+            .ToDictionaryAsync(x => x.UserId, x => x.Phone, cancellationToken);
+
         foreach (var sinal in sinais)
         {
-            // Os sinais NUNCA duplicam: 1 linha por (UserId, SessionId) — o rerun após
-            // falha parcial não cria gêmeo.
+            if (!phones.TryGetValue(sinal.UserId, out var phone) || string.IsNullOrWhiteSpace(phone))
+            {
+                continue;
+            }
+
+            // Os sinais NUNCA duplicam: 1 linha por (UserId, SessionId) — o rerun aps
+            // falha parcial no cria gmeo.
             var existe = await db.LeadsSinal
                 .AnyAsync(l => l.UserId == sinal.UserId && l.SessionId == sinal.SessionId, cancellationToken);
             if (existe)
             {
                 continue;
             }
-
-            var phone = await db.Users
-                .Where(u => u.UserId == sinal.UserId)
-                .Select(u => u.Phone)
-                .FirstOrDefaultAsync(cancellationToken) ?? sinal.UserId.ToString();
 
             db.LeadsSinal.Add(new LeadSinalEntity
             {
