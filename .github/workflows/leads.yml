@@ -1,0 +1,39 @@
+name: leads
+
+# R21: o mineiro. O push roda a suíte; o cron (fase 2, a CADENCIA) roda o job
+# direto no runner (Azure<->Azure saudavel, os dados via secrets GH).
+# O cron '0 6 * * *' = diario 06:00 UTC (03:00 BRT). Editar a cadencia = editar esta linha.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      rodar:
+        description: "Rodar o miner contra a nuvem (alem da suite)"
+        required: false
+        default: "true"
+  schedule:
+    - cron: "0 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leads
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore AiCoachLeads.sln
+      - run: dotnet build AiCoachLeads.sln -c Release --no-restore
+      - run: dotnet test AiCoachLeads.sln -c Release --no-build
+      - name: Resumo
+        run: echo "Suite ok em $(date -u +%FT%TZ). Cadencia: on.schedule diario 06:00 UTC."
