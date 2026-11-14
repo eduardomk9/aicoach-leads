@@ -1,12 +1,15 @@
+using Microsoft.Extensions.Logging;
 using AiCoach.Leads.Domain;
-using AiCoach.Leads.Infrastructure.Sql;
 using Microsoft.EntityFrameworkCore;
 
 namespace AiCoach.Leads.Infrastructure.Sql;
 
-/// <summary>Repositório SQL dos sinais: grava em Lote resolvendo o TELEFONE por join
-/// (Users) — a sessão do Mongo traz só UserId, a mesma identidade.</summary>
-public sealed class SinalRepository(AiCoachLeadsDbContext db) : ISinalRepository
+/// <summary>Repositório SQL: grava a EVIDÊNCIA por conversa (SinalConversa 1:N) e faz
+/// o UPSERT na MESA DE VENDAS (Leads — a análise mais recente por pessoa). O estoque
+/// só aceita usuário REAL: as sessões de ids que não existem em Users (as personas
+/// legadas do R18 no Atlas) ficam fora (sem FK violation, o log conta). O NOME do
+/// lead vem de Users (a identidade limpa) — o miner não toca em Onboardings.</summary>
+public sealed class SinalRepository(AiCoachLeadsDbContext db, ILogger<SinalRepository> logger) : ISinalRepository
 {
     public async Task<int> GravarAsync(IReadOnlyList<SinalLead> sinais, CancellationToken cancellationToken)
     {
@@ -15,74 +18,81 @@ public sealed class SinalRepository(AiCoachLeadsDbContext db) : ISinalRepository
             return 0;
         }
 
-        // O ESTOQUE SO ACEITA USUARIO REAL: sessoes de ids que nao existem em Users
-        // (as personas legadas do R18 no Atlas) ficam DE FORA (sem FK violation).
         var ids = sinais.Select(s => s.UserId).Distinct().ToList();
-        var phones = await db.Users
+        var users = await db.Users
             .Where(u => ids.Contains(u.UserId))
-            .Select(u => new { u.UserId, u.Phone })
-            .ToDictionaryAsync(x => x.UserId, x => x.Phone, cancellationToken);
+            .Select(u => new { u.UserId, u.Phone, u.Name })
+            .ToDictionaryAsync(x => x.UserId, x => (x.Phone, x.Name), cancellationToken);
 
+        var gravados = 0;
         foreach (var sinal in sinais)
         {
-            if (!phones.TryGetValue(sinal.UserId, out var phone) || string.IsNullOrWhiteSpace(phone))
+            if (!users.TryGetValue(sinal.UserId, out var user) || string.IsNullOrWhiteSpace(user.Phone))
             {
+                logger.LogInformation("Sinal ignorado: user {UserId} nao existe em Users (sessao legada).", sinal.UserId);
                 continue;
             }
 
-            // Os sinais NUNCA duplicam: 1 linha por (UserId, SessionId) — o rerun aps
-            // falha parcial no cria gmeo.
-            var existe = await db.LeadsSinal
+            var phone = user.Phone;
+            var nome = string.IsNullOrWhiteSpace(user.Name) ? "(sem nome)" : user.Name;
+
+            // 1) A EVIDÊNCIA por conversa (nunca duplica por (UserId, SessionId)). O
+            // LeadId ligaa mesa quando ela já existe; nasce null e a mesa-upscreve.
+            var evidenciaExiste = await db.SinalConversa
                 .AnyAsync(l => l.UserId == sinal.UserId && l.SessionId == sinal.SessionId, cancellationToken);
-            if (existe)
+            var mesa = await db.Leads.FirstOrDefaultAsync(l => l.UserId == sinal.UserId, cancellationToken);
+
+            if (!evidenciaExiste)
             {
-                continue;
+                db.SinalConversa.Add(new SinalConversaEntity
+                {
+                    UserId = sinal.UserId,
+                    LeadId = mesa?.Id,
+                    SessionId = sinal.SessionId,
+                    AnalisadoEm = DateTime.UtcNow,
+                    Sinais = sinal.Sinais,
+                    Intencao = sinal.Intencao,
+                    Resumo = sinal.Resumo,
+                    Motivo = sinal.Motivo,
+                    ModeloUsado = sinal.ModeloUsado,
+                    TokensIn = sinal.TokensIn,
+                    TokensOut = sinal.TokensOut,
+                    ParaQuem = sinal.ParaQuem,
+                });
+                gravados++;
             }
 
-            db.LeadsSinal.Add(new LeadSinalEntity
+            // 2) A MESA (o upsert da análise mais recente por pessoa: desce nunca).
+            if (mesa is null)
             {
-                UserId = sinal.UserId,
-                Phone = phone,
-                SessionId = sinal.SessionId,
-                AnalisadoEm = DateTime.UtcNow,
-                Sinais = sinal.Sinais,
-                Intencao = sinal.Intencao,
-                Resumo = sinal.Resumo,
-                Motivo = sinal.Motivo,
-                ModeloUsado = sinal.ModeloUsado,
-                TokensIn = sinal.TokensIn,
-                TokensOut = sinal.TokensOut,
-            });
+                db.Leads.Add(new MesaLeadEntity
+                {
+                    UserId = sinal.UserId,
+                    Nome = nome,
+                    Telefone = phone,
+                    Intencao = sinal.Intencao,
+                    Sinais = sinal.Sinais,
+                    Contexto = sinal.Resumo,
+                    Estagio = "CAPTURADO",
+                    Origem = "miner",
+                    SessionId = sinal.SessionId,
+                    ParaQuem = sinal.ParaQuem,
+                    UltimaMuda = DateTime.UtcNow,
+                });
+                gravados++;
+            }
+            else if (sinal.Intencao >= mesa.Intencao || sinal.SessionId == mesa.SessionId)
+            {
+                mesa.Intencao = sinal.Intencao;
+                mesa.Sinais = sinal.Sinais;
+                mesa.Contexto = sinal.Resumo;
+                mesa.SessionId = sinal.SessionId;
+                mesa.ParaQuem = sinal.ParaQuem;
+                mesa.UltimaMuda = DateTime.UtcNow;
+                gravados++;
+            }
         }
 
         return await db.SaveChangesAsync(cancellationToken);
-    }
-}
-
-/// <summary>Marcador de cadência (JobEstado) — o incremental do miner.</summary>
-public sealed class JobEstadoRepository(AiCoachLeadsDbContext db) : IJobEstadoPort
-{
-    public async Task<DateTimeOffset> CarregarAsync(string chave, DateTimeOffset padrao, CancellationToken cancellationToken)
-    {
-        var e = await db.JobEstado.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Chave == chave, cancellationToken);
-        return e is null
-            ? padrao
-            : new DateTimeOffset(DateTime.SpecifyKind(e.UltimaExecucao, DateTimeKind.Utc));
-    }
-
-    public async Task SalvarAsync(string chave, DateTimeOffset ultimaExecucao, string? notas, CancellationToken cancellationToken)
-    {
-        var e = await db.JobEstado.FirstOrDefaultAsync(x => x.Chave == chave, cancellationToken);
-        if (e is null)
-        {
-            db.JobEstado.Add(new JobEstadoEntity { Chave = chave, UltimaExecucao = ultimaExecucao.UtcDateTime, Notas = notas });
-        }
-        else
-        {
-            e.UltimaExecucao = ultimaExecucao.UtcDateTime;
-            e.Notas = notas;
-        }
-        await db.SaveChangesAsync(cancellationToken);
     }
 }

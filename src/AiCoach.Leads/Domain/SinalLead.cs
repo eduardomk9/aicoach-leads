@@ -14,6 +14,9 @@ public sealed class SinalLead
     public string SessionId { get; init; } = string.Empty;
     public string Sinais { get; init; } = string.Empty;
     public int Intencao { get; init; }
+
+    /// <summary>A caixinha do dono: personal | nutri | coach | todos | um-e-outro | indefinido.</summary>
+    public string ParaQuem { get; init; } = "indefinido";
     public string Resumo { get; init; } = string.Empty;
     public string Motivo { get; init; } = string.Empty;
     public string ModeloUsado { get; init; } = string.Empty;

@@ -56,6 +56,10 @@ public sealed class SinalJuizo
     public int SinalDieta { get; init; }
     public int SinalRelatorio { get; init; }
     public int Intenção { get; init; }
+
+    /// <summary>Para quem a pessoa buscaria ajuda: personal | nutri | coach |
+    /// todos | um-e-outro | indefinido (a caixinha do dono).</summary>
+    public string ParaQuem { get; init; } = "indefinido";
     public string Resumo { get; init; } = string.Empty;
     public string Motivo { get; init; } = string.Empty;
     public int TokensIn { get; init; }

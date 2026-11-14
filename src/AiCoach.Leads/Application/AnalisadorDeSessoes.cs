@@ -64,6 +64,7 @@ public sealed class AnalisadorDeSessoes(
                     SessionId = Trunca(slice.SessionId, 80),
                     Sinais = sinaisCsv,
                     Intencao = juizo.Intenção,
+                    ParaQuem = juizo.ParaQuem,
                     Resumo = Trunca(juizo.Resumo, 280),
                     Motivo = Trunca(juizo.Motivo, 240),
                     ModeloUsado = "gpt-oss:20b",
@@ -112,12 +113,18 @@ public sealed class AnalisadorDeSessoes(
             return Truncar(v, max);
         }
 
+        // A caixinha do dono: s aceita o vocabulrio canico (o resto vira indefinido).
+        var validos = new[] { "personal", "nutri", "coach", "todos", "um-e-outro" };
+        var paraquemRaw = GetString("paraquem", 30).Trim().ToLowerInvariant();
+        var paraquem = validos.Contains(paraquemRaw) ? paraquemRaw : "indefinido";
+
         return new SinalJuizo
         {
             SinalTreino = Math.Clamp(GetInt("sinal_treino"), 0, 3),
             SinalDieta = Math.Clamp(GetInt("sinal_dieta"), 0, 3),
             SinalRelatorio = Math.Clamp(GetInt("sinal_relatorio"), 0, 3),
             Intenção = GetInt("intencao"),
+            ParaQuem = paraquem,
             Resumo = GetString("resumo", 280),
             Motivo = GetString("motivo", 240),
         };
