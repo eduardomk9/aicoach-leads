@@ -57,7 +57,7 @@ if (modo == "--ver")
     var analyzer = scope.ServiceProvider.GetRequiredService<AnalisadorDeSessoes>();
     var estado = scope.ServiceProvider.GetRequiredService<IJobEstadoPort>();
     var marcador = await estado.CarregarAsync(AnalisadorDeSessoes.ChaveEstado, DateTimeOffset.UtcNow - AnalisadorDeSessoes.JanelaInicial, CancellationToken.None);
-    Console.WriteLine($"MARCADOR_ATUAL={marcador:o}"); Console.WriteLine("SERVER_EM_USO=" + sqlConn.Split(";")[0]);
+    Console.WriteLine($"MARCADOR_ATUAL={marcador:o}");
     var port = scope.ServiceProvider.GetRequiredService<ISessionsPort>();
     var novas = await port.NovasDesdeAsync(marcador, maxSessoes, CancellationToken.None);
     Console.WriteLine($"SESSOES_NOVAS={novas.Count}");
