@@ -35,5 +35,23 @@ jobs:
       - run: dotnet restore AiCoachLeads.sln
       - run: dotnet build AiCoachLeads.sln -c Release --no-restore
       - run: dotnet test AiCoachLeads.sln -c Release --no-build
+
+  rodar-miner:
+    # Roda S no cron (06:00 UTC) e no dispatch manual - o push s testa.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: testes
+    env:
+      DOTNET_ENVIRONMENT: Production
+      Agent__ApiKey: ${{ secrets.AGENT_APIKEY }}
+      ConnectionStrings__MongoConnection: ${{ secrets.MONGO_CONN }}
+      ConnectionStrings__SqlServer: ${{ secrets.SQL_CONN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet run --project src/AiCoach.Leads -c Release -- --rodar
       - name: Resumo
-        run: echo "Suite ok em $(date -u +%FT%TZ). Cadencia: on.schedule diario 06:00 UTC."
+        run: echo "Miner rodou em $(date -u +%FT%TZ) (cron 06:00 UTC diario)."
