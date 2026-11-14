@@ -3,15 +3,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AiCoach.Leads.Infrastructure.Sql;
 
-/// <summary>Entidade EF da EVIDÊNCIA por conversa. Tabela física: dbo.ConversationSignals
-/// (ddl-007 — antes LeadsSinal/SinalConversa na noite de transição). Coluna física "Id"
-/// (IDENTITY) — o mapeamento explícito é a régua.</summary>
+/// <summary>Entidade EF da EVIDÊNCIA por conversa. Tabela física: dbo.ConversationSignals.
+/// Coluna física "SignalId" (IDENTITY) — o nome da tabela nos ids (a régua do dono).</summary>
 public class ConversationSignalEntity
 {
-    public int Id { get; set; }
+    public int SignalId { get; set; }
     public int LeadId { get; set; }
     public int UserId { get; set; }
-    public string ContactPhone { get; set; } = null!;
+    public string Phone { get; set; } = null!;
     public string SessionId { get; set; } = null!;
     public DateTime AnalyzedAt { get; set; }
     public string Signals { get; set; } = null!;
@@ -23,10 +22,11 @@ public class ConversationSignalEntity
     public int TokensOut { get; set; }
 }
 
-/// <summary>Entidade EF de JobEstado: o marcador da cadência do miner.</summary>
+/// <summary>Entidade EF de JobStates: o marcador da cadência do miner. Coluna física
+/// "JobStateId" (o nome da tabela nos ids).</summary>
 public class JobStateEntity
 {
-    public string Key { get; set; } = null!;
+    public string JobStateId { get; set; } = null!;
     public DateTime LastRunAt { get; set; }
     public string? Notes { get; set; }
 }
@@ -35,7 +35,7 @@ public class JobStateEntity
 /// UPSERT da análise mais recente; o ESTÁGIO é gerenciado pelo dono.</summary>
 public class LeadEntity
 {
-    public int Id { get; set; }
+    public int LeadId { get; set; }
     public int UserId { get; set; }
     public string Name { get; set; } = null!;
     public string Phone { get; set; } = null!;
@@ -78,11 +78,11 @@ public sealed class AiCoachLeadsDbContext(DbContextOptions<AiCoachLeadsDbContext
         modelBuilder.Entity<ConversationSignalEntity>(e =>
         {
             e.ToTable("ConversationSignals");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("Id");
+            e.HasKey(x => x.SignalId);
+            e.Property(x => x.SignalId).HasColumnName("SignalId");
             e.Property(x => x.LeadId).HasColumnName("LeadId");
             e.Property(x => x.UserId).HasColumnName("UserId");
-            e.Property(x => x.ContactPhone).HasColumnName("ContactPhone").HasMaxLength(20);
+            e.Property(x => x.Phone).HasColumnName("Phone").HasMaxLength(20);
             e.Property(x => x.SessionId).HasColumnName("SessionId").HasMaxLength(80);
             e.Property(x => x.AnalyzedAt).HasColumnName("AnalyzedAt").HasColumnType("datetime2");
             e.Property(x => x.Signals).HasColumnName("Signals").HasMaxLength(120);
@@ -97,8 +97,8 @@ public sealed class AiCoachLeadsDbContext(DbContextOptions<AiCoachLeadsDbContext
         modelBuilder.Entity<LeadEntity>(e =>
         {
             e.ToTable("Leads");
-            e.HasKey(x => x.Id);
-            e.Property(x => x.Id).HasColumnName("Id");
+            e.HasKey(x => x.LeadId);
+            e.Property(x => x.LeadId).HasColumnName("LeadId");
             e.Property(x => x.UserId).HasColumnName("UserId");
             e.Property(x => x.Name).HasColumnName("Name").HasMaxLength(160);
             e.Property(x => x.Phone).HasColumnName("Phone").HasMaxLength(20);
@@ -115,11 +115,11 @@ public sealed class AiCoachLeadsDbContext(DbContextOptions<AiCoachLeadsDbContext
 
         modelBuilder.Entity<JobStateEntity>(e =>
         {
-            e.ToTable("JobEstado");
-            e.HasKey(x => x.Key);
-            e.Property(x => x.Key).HasColumnName("Chave").HasMaxLength(64);
-            e.Property(x => x.LastRunAt).HasColumnName("UltimaExecucao").HasColumnType("datetime2");
-            e.Property(x => x.Notes).HasColumnName("Notas").HasMaxLength(200);
+            e.ToTable("JobStates");
+            e.HasKey(x => x.JobStateId);
+            e.Property(x => x.JobStateId).HasColumnName("JobStateId").HasMaxLength(64);
+            e.Property(x => x.LastRunAt).HasColumnName("LastRunAt").HasColumnType("datetime2");
+            e.Property(x => x.Notes).HasColumnName("Notes").HasMaxLength(200);
         });
 
         modelBuilder.Entity<UserProjectionEntity>(e =>

@@ -4,9 +4,10 @@ using Microsoft.Extensions.Logging;
 
 namespace AiCoach.Leads.Infrastructure.Sql;
 
-/// <summary>Repositório SQL: APPEND na evidência (ConversationSignals) e o UPSERT na
-/// mesa (Leads - a análise mais recente). O estoque s aceita usurio REAL. O NOME
-/// vem de Users; o miner no toca em Onboardings.</summary>
+/// <summary>Repositório SQL: APPEND na evidência (ConversationSignals, LeadId) e o
+/// UPSERT na mesa (Leads - a análise mais recente). O estoque só aceita usuário REAL
+/// (o skip das sessões legidas). O nome do lead vem de Users; o miner no toca em
+/// Onboardings.</summary>
 public sealed class SinalRepository(AiCoachLeadsDbContext db, ILogger<SinalRepository> logger) : ISinalRepository
 {
     public async Task<int> GravarAsync(IReadOnlyList<SinalLead> sinais, CancellationToken cancellationToken)
@@ -56,12 +57,12 @@ public sealed class SinalRepository(AiCoachLeadsDbContext db, ILogger<SinalRepos
                 await db.SaveChangesAsync(cancellationToken);
                 gravados++;
 
-                // A evidncia liga ao lead novo (o Id nasceu no save).
+                // A evidncia liga ao lead novo (o LeadId nasceu no save).
                 db.ConversationSignals.Add(new ConversationSignalEntity
                 {
-                    LeadId = db.Leads.Local.First(l => l.UserId == sinal.UserId).Id,
+                    LeadId = db.Leads.Local.First(l => l.UserId == sinal.UserId).LeadId,
                     UserId = sinal.UserId,
-                    ContactPhone = phone,
+                    Phone = phone,
                     SessionId = sinal.SessionId,
                     AnalyzedAt = DateTime.UtcNow,
                     Signals = sinal.Sinais,
@@ -78,14 +79,14 @@ public sealed class SinalRepository(AiCoachLeadsDbContext db, ILogger<SinalRepos
 
             // 1) A EVIDNCIA (append por rodada; nunca duplica por (LeadId, SessionId)).
             var evidenciaExiste = await db.ConversationSignals
-                .AnyAsync(l => l.LeadId == lead.Id && l.SessionId == sinal.SessionId, cancellationToken);
+                .AnyAsync(l => l.LeadId == lead.LeadId && l.SessionId == sinal.SessionId, cancellationToken);
             if (!evidenciaExiste)
             {
                 db.ConversationSignals.Add(new ConversationSignalEntity
                 {
-                    LeadId = lead.Id,
+                    LeadId = lead.LeadId,
                     UserId = sinal.UserId,
-                    ContactPhone = phone,
+                    Phone = phone,
                     SessionId = sinal.SessionId,
                     AnalyzedAt = DateTime.UtcNow,
                     Signals = sinal.Sinais,

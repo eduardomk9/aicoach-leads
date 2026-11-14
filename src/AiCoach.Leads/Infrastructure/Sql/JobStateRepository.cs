@@ -9,7 +9,7 @@ public sealed class JobStateRepository(AiCoachLeadsDbContext db) : IJobEstadoPor
     public async Task<DateTimeOffset> CarregarAsync(string chave, DateTimeOffset padrao, CancellationToken cancellationToken)
     {
         var e = await db.JobStates.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Key == chave, cancellationToken);
+            .FirstOrDefaultAsync(x => x.JobStateId == chave, cancellationToken);
         return e is null
             ? padrao
             : new DateTimeOffset(DateTime.SpecifyKind(e.LastRunAt, DateTimeKind.Utc));
@@ -17,10 +17,10 @@ public sealed class JobStateRepository(AiCoachLeadsDbContext db) : IJobEstadoPor
 
     public async Task SalvarAsync(string chave, DateTimeOffset ultimaExecucao, string? notas, CancellationToken cancellationToken)
     {
-        var e = await db.JobStates.FirstOrDefaultAsync(x => x.Key == chave, cancellationToken);
+        var e = await db.JobStates.FirstOrDefaultAsync(x => x.JobStateId == chave, cancellationToken);
         if (e is null)
         {
-            db.JobStates.Add(new JobStateEntity { Key = chave, LastRunAt = ultimaExecucao.UtcDateTime, Notes = notas });
+            db.JobStates.Add(new JobStateEntity { JobStateId = chave, LastRunAt = ultimaExecucao.UtcDateTime, Notes = notas });
         }
         else
         {
