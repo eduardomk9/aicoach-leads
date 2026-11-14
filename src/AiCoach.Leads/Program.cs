@@ -39,7 +39,7 @@ if (string.IsNullOrWhiteSpace(sqlConn))
 }
 builder.Services.AddDbContext<AiCoachLeadsDbContext>(o => o.UseSqlServer(sqlConn));
 builder.Services.AddScoped<ISinalRepository, SinalRepository>();
-builder.Services.AddScoped<IJobEstadoPort, JobEstadoRepository>();
+builder.Services.AddScoped<IJobEstadoPort, JobStateRepository>();
 builder.Services.AddScoped<AnalisadorDeSessoes>();
 
 using var host = builder.Build();
@@ -57,7 +57,7 @@ if (modo == "--ver")
     var analyzer = scope.ServiceProvider.GetRequiredService<AnalisadorDeSessoes>();
     var estado = scope.ServiceProvider.GetRequiredService<IJobEstadoPort>();
     var marcador = await estado.CarregarAsync(AnalisadorDeSessoes.ChaveEstado, DateTimeOffset.UtcNow - AnalisadorDeSessoes.JanelaInicial, CancellationToken.None);
-    Console.WriteLine($"MARCADOR_ATUAL={marcador:o}");
+    Console.WriteLine($"MARCADOR_ATUAL={marcador:o}"); Console.WriteLine("SERVER_EM_USO=" + sqlConn.Split(";")[0]);
     var port = scope.ServiceProvider.GetRequiredService<ISessionsPort>();
     var novas = await port.NovasDesdeAsync(marcador, maxSessoes, CancellationToken.None);
     Console.WriteLine($"SESSOES_NOVAS={novas.Count}");
