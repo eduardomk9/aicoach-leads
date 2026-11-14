@@ -39,5 +39,5 @@ public static class MinerPrompt
         """;
 
     /// <summary>O briefing entra como content único.</summary>
-    public const string RotuloBriefing = "BRIEFING DA CONVERSA:";
+    public const string BriefingLabel = "BRIEFING DA CONVERSA:";
 }

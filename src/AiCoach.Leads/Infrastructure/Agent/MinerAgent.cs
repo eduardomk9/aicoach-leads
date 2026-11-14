@@ -54,7 +54,7 @@ public sealed class OpenAiCompatibleMinerAgent(
             ["messages"] = new object[]
             {
                 new { role = "system", content = MinerPrompt.Sistema },
-                new { role = "user", content = $"{MinerPrompt.RotuloBriefing}\n{briefing}" },
+                new { role = "user", content = $"{MinerPrompt.BriefingLabel}\n{briefing}" },
             },
             ["response_format"] = new { type = "json_object" },
         };
