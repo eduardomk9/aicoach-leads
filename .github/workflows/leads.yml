@@ -13,8 +13,10 @@ on:
         description: "Rodar o miner contra a nuvem (alem da suite)"
         required: false
         default: "true"
-  schedule:
-    - cron: "0 6 * * *"
+  # CRON PAUSADO (dono 15/11, periodo de teste): so on-demand (workflow_dispatch).
+  # Para religar: descomentar e apagar esta linha.
+  # schedule:
+  #   - cron: "0 6 * * *"
 
 permissions:
   contents: read
